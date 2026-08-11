@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Carnet — Poste de contrôle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --void:#0A0D10;
+    --panel:#12171B;
+    --panel-raised:#171D22;
+    --hairline:#232B30;
+    --ink:#DCE4E7;
+    --mute:#5C6C73;
+    --mute-2:#3A464C;
+    --signal:#5BC8FF;
+    --ok:#3ED598;
+    --danger:#FF5D5D;
+    --warn:#E8A33D;
+    --radius:3px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--void);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif;
+    min-height:100vh;
+    background-image:
+      repeating-linear-gradient(180deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+    -webkit-font-smoothing:antialiased;
+  }
+  .disp{font-family:'Space Grotesk',sans-serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  ::selection{background:var(--signal);color:var(--void);}
+  a{color:var(--signal);}
+  button{font-family:inherit;cursor:pointer;}
+  input:focus, button:focus-visible{outline:2px solid var(--signal);outline-offset:2px;}
+
+  /* ---------- Shell ---------- */
+  .shell{max-width:760px;margin:0 auto;padding:20px 16px 60px;min-height:100vh;}
+
+  /* ---------- Header ---------- */
+  .head{
+    display:flex;align-items:flex-start;justify-content:space-between;
+    padding-bottom:18px;margin-bottom:22px;border-bottom:1px solid var(--hairline);
+    gap:12px;
+  }
+  .head-title{display:flex;gap:10px;align-items:flex-start;}
+  .head-bar{width:3px;align-self:stretch;background:var(--signal);border-radius:2px;flex-shrink:0;min-height:38px;}
+  .head h1{font-size:15px;letter-spacing:0.14em;text-transform:uppercase;font-weight:600;}
+  .head .sub{font-size:12px;color:var(--mute);margin-top:4px;letter-spacing:0.02em;}
+  .head-meta{text-align:right;font-size:11px;color:var(--mute);}
+  .live{display:inline-flex;align-items:center;gap:6px;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--ok);margin-bottom:6px;}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(62,213,152,0.6);animation:pulse 2.2s infinite;}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(62,213,152,0.5);}
+    70%{box-shadow:0 0 0 6px rgba(62,213,152,0);}
+    100%{box-shadow:0 0 0 0 rgba(62,213,152,0);}
+  }
+  .whoami{font-size:12px;color:var(--ink);}
+  .logout{background:none;border:1px solid var(--hairline);color:var(--mute);font-size:11px;padding:5px 10px;border-radius:var(--radius);margin-top:6px;letter-spacing:0.04em;}
+  .logout:hover{border-color:var(--danger);color:var(--danger);}
+
+  /* ---------- Stats ---------- */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--hairline);border:1px solid var(--hairline);border-radius:var(--radius);overflow:hidden;margin-bottom:28px;}
+  .stat{background:var(--panel);padding:16px 14px;}
+  .stat-num{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;line-height:1;color:var(--ink);}
+  .stat-num.accent{color:var(--signal);}
+  .stat-label{font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--mute);margin-top:7px;}
+
+  /* ---------- Section ---------- */
+  .section-title{
+    display:flex;align-items:center;justify-content:space-between;
+    font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--mute);
+    margin-bottom:12px;
+  }
+  .section-title .count{color:var(--warn);font-family:'IBM Plex Mono',monospace;}
+
+  /* ---------- Queue rows ---------- */
+  .queue{border:1px solid var(--hairline);border-radius:var(--radius);overflow:hidden;background:var(--panel);}
+  .row{padding:14px 16px;border-bottom:1px solid var(--hairline);display:flex;flex-direction:column;gap:8px;}
+  .row:last-child{border-bottom:none;}
+  .row-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .row-name{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--warn);flex-shrink:0;}
+  .row-amount{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:var(--ink);}
+  .row-meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mute);letter-spacing:0.02em;}
+  .row-actions{display:flex;gap:8px;margin-top:2px;}
+  .btn{
+    font-size:11px;letter-spacing:0.06em;text-transform:uppercase;padding:7px 14px;
+    border-radius:var(--radius);border:1px solid var(--hairline);background:var(--panel-raised);color:var(--ink);
+    transition:border-color .15s, color .15s;
+  }
+  .btn-ok{border-color:rgba(62,213,152,0.35);color:var(--ok);}
+  .btn-ok:hover{border-color:var(--ok);background:rgba(62,213,152,0.08);}
+  .btn-danger{border-color:rgba(255,93,93,0.3);color:var(--danger);}
+  .btn-danger:hover{border-color:var(--danger);background:rgba(255,93,93,0.08);}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+  .empty{padding:34px 16px;text-align:center;color:var(--mute);font-size:13px;}
+  .empty .mono{display:block;margin-top:6px;font-size:11px;color:var(--mute-2);letter-spacing:0.05em;}
+
+  /* ---------- Login ---------- */
+  .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .login-box{width:100%;max-width:340px;}
+  .login-box .head-bar{height:3px;width:44px;margin-bottom:16px;}
+  .login-box h1{font-size:14px;letter-spacing:0.14em;text-transform:uppercase;margin-bottom:4px;}
+  .login-box .sub{font-size:12px;color:var(--mute);margin-bottom:26px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--mute);margin-bottom:6px;}
+  .field input{
+    width:100%;background:var(--panel);border:1px solid var(--hairline);color:var(--ink);
+    padding:11px 12px;border-radius:var(--radius);font-size:14px;font-family:'IBM Plex Mono',monospace;
+  }
+  .field input:focus{border-color:var(--signal);}
+  .login-btn{
+    width:100%;background:var(--signal);color:var(--void);border:none;padding:12px;
+    border-radius:var(--radius);font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-top:6px;
+  }
+  .login-btn:disabled{opacity:0.5;}
+  .login-err{font-size:12px;color:var(--danger);margin-top:12px;font-family:'IBM Plex Mono',monospace;}
+  .denied{border:1px solid rgba(255,93,93,0.3);background:rgba(255,93,93,0.06);padding:16px;border-radius:var(--radius);margin-top:18px;font-size:13px;color:var(--ink);}
+  .denied .mono{color:var(--danger);font-size:11px;display:block;margin-top:8px;}
+
+  .toast-container{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:99;display:flex;flex-direction:column;gap:8px;align-items:center;}
+  .toast{
+    background:var(--panel-raised);border:1px solid var(--hairline);color:var(--ink);
+    padding:10px 16px;border-radius:var(--radius);font-size:12px;font-family:'IBM Plex Mono',monospace;
+    opacity:0;transform:translateY(6px);transition:opacity .25s, transform .25s;white-space:nowrap;
+  }
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast.err{border-color:rgba(255,93,93,0.4);color:var(--danger);}
+
+  @media (max-width:480px){
+    .stats{grid-template-columns:1fr;}
+    .stat-num{font-size:22px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+function showFatal(html){
+  const app = document.getElementById('app');
+  if (app) app.innerHTML = `<div class="login-wrap"><div class="login-box"><div class="head-bar" style="background:var(--danger);"></div>${html}</div></div>`;
+}
+window.addEventListener('error', function(e){
+  const app = document.getElementById('app');
+  if (app && !app.innerHTML.trim()) {
+    showFatal(`<h1 class="disp">Erreur de chargement</h1><p class="sub mono">${String(e.message || 'Erreur inconnue').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</p>`);
+  }
+});
+window.addEventListener('unhandledrejection', function(e){
+  const app = document.getElementById('app');
+  if (app && !app.innerHTML.trim()) {
+    const msg = (e.reason && (e.reason.message || e.reason.code)) || String(e.reason) || 'Erreur inconnue';
+    showFatal(`<h1 class="disp">Erreur de chargement</h1><p class="sub mono">${String(msg).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</p>`);
+  }
+});
+setTimeout(function(){
+  const app = document.getElementById('app');
+  if (app && !app.innerHTML.trim()) {
+    showFatal(`<h1 class="disp">Chargement bloqué</h1><p class="sub mono">La page ne répond pas. Probablement une connexion internet coupée, ou le stockage local bloqué par le navigateur sur ce type de fichier. Essaie d'ouvrir ce fichier via un lien http:// plutôt que depuis les téléchargements.</p>`);
+  }
+}, 6000);
+
+/* ======================================================
+   CARNET — POSTE DE CONTRÔLE (admin, hors du site principal)
+   Même projet Firebase que Carnet — accès réservé aux comptes
+   avec isAdmin:true sur leur doc landlords/{uid}.
+   ====================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyBI5J1jtVdRa_2ZP_s3vao-QulBMpLWVmk",
+  authDomain: "hoopci.firebaseapp.com",
+  projectId: "hoopci",
+  storageBucket: "hoopci.firebasestorage.app",
+  messagingSenderId: "200813723178",
+  appId: "1:200813723178:web:91ab9102cf45fb11e94d53"
+};
+
+let auth, db;
+if (typeof firebase === 'undefined') {
+  showFatal(`<h1 class="disp">Connexion impossible</h1><p class="sub mono">Le SDK Firebase ne s'est pas chargé. Vérifie ta connexion internet et recharge la page. Si ça persiste, essaie d'ouvrir ce fichier via un lien http:// plutôt qu'en le téléchargeant/l'ouvrant directement depuis les téléchargements.</p>`);
+} else {
+  firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  db = firebase.firestore();
+}
+
+const PLAN_NOMS = { essentiel: 'Essentiel', pro: 'Pro' };
+let currentUser = null;
+let isAdmin = false;
+let busyIds = new Set();
+
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtFCFA(n){ return (Number(n)||0).toLocaleString('fr-FR') + ' FCFA'; }
+function toast(msg, type){
+  const c = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type === 'err' ? ' err' : '');
+  el.textContent = msg;
+  c.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2800);
+}
+function nowStr(){
+  return new Date().toLocaleString('fr-FR', { weekday:'short', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+
+const app = document.getElementById('app');
+
+/* ---------- Vue : connexion ---------- */
+function renderLogin(errMsg){
+  app.innerHTML = `
+    <div class="login-wrap">
+      <div class="login-box">
+        <div class="head-bar"></div>
+        <h1 class="disp">Poste de contrôle</h1>
+        <p class="sub mono">Carnet — accès administrateur</p>
+        <form id="login-form">
+          <div class="field">
+            <label>Email</label>
+            <input type="email" id="login-email" autocomplete="username" required>
+          </div>
+          <div class="field">
+            <label>Mot de passe</label>
+            <input type="password" id="login-pass" autocomplete="current-password" required>
+          </div>
+          <button type="submit" class="login-btn" id="login-btn">Se connecter</button>
+        </form>
+        ${errMsg ? `<p class="login-err mono">${esc(errMsg)}</p>` : ''}
+      </div>
+    </div>`;
+  document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('login-btn');
+    const email = document.getElementById('login-email').value.trim();
+    const pass = document.getElementById('login-pass').value;
+    btn.disabled = true; btn.textContent = 'Connexion...';
+    try {
+      await auth.signInWithEmailAndPassword(email, pass);
+    } catch (err) {
+      renderLogin(traduireErreur(err));
+    }
+  });
+}
+
+function traduireErreur(err){
+  const code = err?.code || '';
+  if (code.includes('user-not-found') || code.includes('wrong-password') || code.includes('invalid-credential')) return 'Email ou mot de passe incorrect.';
+  if (code.includes('too-many-requests')) return 'Trop de tentatives — réessaie dans quelques minutes.';
+  return 'Erreur : ' + (err?.message || 'connexion impossible.');
+}
+
+/* ---------- Vue : accès refusé ---------- */
+function renderDenied(){
+  app.innerHTML = `
+    <div class="login-wrap">
+      <div class="login-box">
+        <div class="head-bar" style="background:var(--danger);"></div>
+        <h1 class="disp">Accès refusé</h1>
+        <div class="denied">
+          Ce compte n'a pas les droits administrateur.
+          <span class="mono">${esc(currentUser?.email || '')}</span>
+        </div>
+        <button class="logout" id="denied-logout" style="margin-top:16px;">Se déconnecter</button>
+      </div>
+    </div>`;
+  document.getElementById('denied-logout').addEventListener('click', () => auth.signOut());
+}
+
+/* ---------- Vue : tableau de bord ---------- */
+async function renderDashboard(){
+  app.innerHTML = `
+    <div class="shell">
+      <div class="head">
+        <div class="head-title">
+          <div class="head-bar"></div>
+          <div>
+            <h1 class="disp">Poste de contrôle</h1>
+            <div class="sub mono">Carnet — Administration</div>
+          </div>
+        </div>
+        <div class="head-meta">
+          <div class="live"><span class="live-dot"></span>En ligne</div>
+          <div class="whoami mono">${esc(currentUser.email)}</div>
+          <button class="logout" id="logout-btn">Déconnexion</button>
+        </div>
+      </div>
+      <div id="stats" class="stats">
+        <div class="stat"><div class="stat-num mono">···</div><div class="stat-label">Propriétaires</div></div>
+        <div class="stat"><div class="stat-num mono">···</div><div class="stat-label">Abonnements actifs</div></div>
+        <div class="stat"><div class="stat-num mono accent">···</div><div class="stat-label">En attente</div></div>
+      </div>
+      <div class="section-title">
+        <span>File d'attente — validation des abonnements</span>
+      </div>
+      <div id="queue" class="queue">
+        <div class="empty">Chargement<span class="mono">requête Firestore en cours...</span></div>
+      </div>
+    </div>`;
+  document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
+  await loadData();
+}
+
+async function loadData(){
+  try {
+    const [landlordsSnap, reqSnap] = await Promise.all([
+      db.collection('landlords').get(),
+      db.collection('subscriptionRequests').where('statut', '==', 'en_attente').get()
+    ]);
+    const total = landlordsSnap.size;
+    const actifs = landlordsSnap.docs.filter(d => d.data().abonnementStatut === 'actif').length;
+    const requests = reqSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const statsEl = document.getElementById('stats');
+    statsEl.innerHTML = `
+      <div class="stat"><div class="stat-num mono">${total}</div><div class="stat-label">Propriétaires</div></div>
+      <div class="stat"><div class="stat-num mono">${actifs}</div><div class="stat-label">Abonnements actifs</div></div>
+      <div class="stat"><div class="stat-num mono accent">${requests.length}</div><div class="stat-label">En attente</div></div>`;
+
+    renderQueue(requests);
+  } catch (err) {
+    document.getElementById('queue').innerHTML = `<div class="empty">Erreur de chargement<span class="mono">${esc(err.message)}</span></div>`;
+    toast('Erreur : ' + err.message, 'err');
+  }
+}
+
+function renderQueue(requests){
+  const el = document.getElementById('queue');
+  if (requests.length === 0) {
+    el.innerHTML = `<div class="empty">Aucune demande en attente.<span class="mono">Tout est à jour.</span></div>`;
+    return;
+  }
+  el.innerHTML = requests.map(r => `
+    <div class="row" data-row="${r.id}">
+      <div class="row-top">
+        <div class="row-name"><span class="dot"></span>${esc(r.landlordNom || r.landlordEmail || '—')}</div>
+        <div class="row-amount">${fmtFCFA(r.montant)}</div>
+      </div>
+      <div class="row-meta">${esc(PLAN_NOMS[r.plan] || r.plan)} · ${esc(r.reference || '—')} · ${esc(r.dateCreation || '—')}</div>
+      <div class="row-actions">
+        <button class="btn btn-ok" data-act="approve" data-id="${r.id}">Valider</button>
+        <button class="btn btn-danger" data-act="reject" data-id="${r.id}">Rejeter</button>
+      </div>
+    </div>`).join('');
+
+  el.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-id');
+      const act = btn.getAttribute('data-act');
+      if (act === 'approve') approveRequest(id);
+      else rejectRequest(id);
+    });
+  });
+}
+
+async function approveRequest(id){
+  if (busyIds.has(id)) return;
+  busyIds.add(id); setRowDisabled(id, true);
+  try {
+    const reqDoc = await db.collection('subscriptionRequests').doc(id).get();
+    if (!reqDoc.exists) { toast('Demande introuvable', 'err'); return; }
+    const r = reqDoc.data();
+    const expire = new Date(); expire.setDate(expire.getDate() + 30);
+    await db.collection('landlords').doc(r.landlordId).update({
+      plan: r.plan, abonnementStatut: 'actif', abonnementExpire: expire.toISOString().slice(0, 10)
+    });
+    await db.collection('subscriptionRequests').doc(id).update({ statut: 'validee' });
+    toast('Abonnement validé');
+    await loadData();
+  } catch (err) {
+    toast('Erreur : ' + err.message, 'err');
+  } finally {
+    busyIds.delete(id);
+  }
+}
+
+async function rejectRequest(id){
+  if (busyIds.has(id)) return;
+  if (!confirm('Rejeter cette demande ?')) return;
+  busyIds.add(id); setRowDisabled(id, true);
+  try {
+    await db.collection('subscriptionRequests').doc(id).update({ statut: 'rejetee' });
+    toast('Demande rejetée');
+    await loadData();
+  } catch (err) {
+    toast('Erreur : ' + err.message, 'err');
+  } finally {
+    busyIds.delete(id);
+  }
+}
+
+function setRowDisabled(id, val){
+  const row = document.querySelector(`[data-row="${id}"]`);
+  if (row) row.querySelectorAll('button').forEach(b => b.disabled = val);
+}
+
+/* ---------- Auth state ---------- */
+if (auth) {
+  auth.onAuthStateChanged(async user => {
+    if (!user) {
+      currentUser = null; isAdmin = false;
+      renderLogin();
+      return;
+    }
+    currentUser = user;
+    app.innerHTML = `<div class="login-wrap"><p class="mono" style="color:var(--mute);">Vérification des droits...</p></div>`;
+    try {
+      const doc = await db.collection('landlords').doc(user.uid).get();
+      isAdmin = !!(doc.exists && doc.data().isAdmin === true);
+      if (isAdmin) renderDashboard();
+      else renderDenied();
+    } catch (err) {
+      renderDenied();
+    }
+  });
+}
+</script>
+</body>
+</html>
