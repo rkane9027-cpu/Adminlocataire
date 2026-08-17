@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Carnet — Poste de contrôle</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235BC8FF'/%3E%3Ctext x='32' y='45' font-family='Arial,sans-serif' font-weight='700' font-size='36' fill='%230A0D10' text-anchor='middle'%3EL%3C/text%3E%3C/svg%3E">
+<title>Loyer Pro — Poste de contrôle</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -70,7 +71,7 @@
   .logout:hover{border-color:var(--danger);color:var(--danger);}
 
   /* ---------- Stats ---------- */
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--hairline);border:1px solid var(--hairline);border-radius:var(--radius);overflow:hidden;margin-bottom:28px;}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--hairline);border:1px solid var(--hairline);border-radius:var(--radius);overflow:hidden;margin-bottom:28px;}
   .stat{background:var(--panel);padding:16px 14px;}
   .stat-num{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;line-height:1;color:var(--ink);}
   .stat-num.accent{color:var(--signal);}
@@ -140,9 +141,40 @@
   .toast.err{border-color:rgba(255,93,93,0.4);color:var(--danger);}
 
   @media (max-width:480px){
-    .stats{grid-template-columns:1fr;}
+    .stats{grid-template-columns:repeat(2,1fr);}
     .stat-num{font-size:22px;}
   }
+
+  /* ---------- Recherche & select ---------- */
+  .search-input{
+    width:100%;background:var(--panel);border:1px solid var(--hairline);color:var(--ink);
+    padding:11px 12px;border-radius:var(--radius);font-size:13px;font-family:'IBM Plex Mono',monospace;
+    margin-bottom:10px;
+  }
+  .search-input:focus{border-color:var(--signal);}
+  .field select{
+    width:100%;background:var(--panel);border:1px solid var(--hairline);color:var(--ink);
+    padding:11px 12px;border-radius:var(--radius);font-size:14px;font-family:'IBM Plex Sans',sans-serif;
+  }
+  .field select:focus{border-color:var(--signal);}
+  .plan-tag{font-size:10px;letter-spacing:0.05em;text-transform:uppercase;padding:2px 7px;border-radius:999px;border:1px solid var(--hairline);}
+  .plan-tag.actif{color:var(--ok);border-color:rgba(62,213,152,.35);}
+  .plan-tag.essai{color:var(--warn);border-color:rgba(232,163,61,.35);}
+  .plan-tag.attente{color:var(--signal);border-color:rgba(91,200,255,.35);}
+  .plan-tag.none{color:var(--mute);}
+
+  /* ---------- Modale ---------- */
+  .modal-overlay{position:fixed;inset:0;background:rgba(5,7,9,.72);display:flex;align-items:center;justify-content:center;padding:20px;z-index:70;}
+  .modal-card{background:var(--panel);border:1px solid var(--hairline);border-radius:var(--radius);padding:22px;width:100%;max-width:380px;max-height:88vh;overflow-y:auto;}
+  .modal-card-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px;}
+  .modal-card h2{font-size:13px;letter-spacing:0.1em;text-transform:uppercase;font-family:'Space Grotesk';}
+  .modal-close{background:none;border:none;color:var(--mute);font-size:20px;cursor:pointer;line-height:1;}
+  .modal-sub{font-size:12px;color:var(--mute);margin-bottom:18px;font-family:'IBM Plex Mono',monospace;}
+  .save-btn{
+    width:100%;background:var(--signal);color:var(--void);border:none;padding:12px;
+    border-radius:var(--radius);font-size:12px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;margin-top:6px;
+  }
+  .save-btn:disabled{opacity:0.5;}
 </style>
 </head>
 <body>
@@ -177,7 +209,7 @@ setTimeout(function(){
 
 /* ======================================================
    CARNET — POSTE DE CONTRÔLE (admin, hors du site principal)
-   Même projet Firebase que Carnet — accès réservé aux comptes
+   Même projet Firebase que Loyer Pro — accès réservé aux comptes
    avec isAdmin:true sur leur doc landlords/{uid}.
    ====================================================== */
 const firebaseConfig = {
@@ -202,6 +234,7 @@ const PLAN_NOMS = { essentiel: 'Essentiel', pro: 'Pro' };
 let currentUser = null;
 let isAdmin = false;
 let busyIds = new Set();
+let allLandlords = [];
 
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmtFCFA(n){ return (Number(n)||0).toLocaleString('fr-FR') + ' FCFA'; }
@@ -227,7 +260,7 @@ function renderLogin(errMsg){
       <div class="login-box">
         <div class="head-bar"></div>
         <h1 class="disp">Poste de contrôle</h1>
-        <p class="sub mono">Carnet — accès administrateur</p>
+        <p class="sub mono">Loyer Pro — accès administrateur</p>
         <form id="login-form">
           <div class="field">
             <label>Email</label>
@@ -289,7 +322,7 @@ async function renderDashboard(){
           <div class="head-bar"></div>
           <div>
             <h1 class="disp">Poste de contrôle</h1>
-            <div class="sub mono">Carnet — Administration</div>
+            <div class="sub mono">Loyer Pro — Administration</div>
           </div>
         </div>
         <div class="head-meta">
@@ -302,6 +335,7 @@ async function renderDashboard(){
         <div class="stat"><div class="stat-num mono">···</div><div class="stat-label">Propriétaires</div></div>
         <div class="stat"><div class="stat-num mono">···</div><div class="stat-label">Abonnements actifs</div></div>
         <div class="stat"><div class="stat-num mono accent">···</div><div class="stat-label">En attente</div></div>
+        <div class="stat"><div class="stat-num mono">···</div><div class="stat-label">Revenu total</div></div>
       </div>
       <div class="section-title">
         <span>File d'attente — validation des abonnements</span>
@@ -309,32 +343,134 @@ async function renderDashboard(){
       <div id="queue" class="queue">
         <div class="empty">Chargement<span class="mono">requête Firestore en cours...</span></div>
       </div>
-    </div>`;
+
+      <div class="section-title" style="margin-top:32px;">
+        <span>Tous les propriétaires</span>
+        <span class="count mono" id="landlord-count">···</span>
+      </div>
+      <input type="text" id="landlord-search" class="search-input" placeholder="Rechercher par nom ou email...">
+      <div id="landlords-list" class="queue">
+        <div class="empty">Chargement<span class="mono">requête Firestore en cours...</span></div>
+      </div>
+
+      <div class="section-title" style="margin-top:32px;">
+        <span>Messages du support</span>
+        <span class="count mono" id="support-count">···</span>
+      </div>
+      <div id="support-list" class="queue">
+        <div class="empty">Chargement<span class="mono">requête Firestore en cours...</span></div>
+      </div>
+    </div>
+  <div id="modal-root"></div>`;
   document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
+  document.getElementById('landlord-search').addEventListener('input', e => {
+    renderLandlordsList(filterLandlords(e.target.value));
+  });
   await loadData();
 }
 
 async function loadData(){
   try {
-    const [landlordsSnap, reqSnap] = await Promise.all([
+    const [landlordsSnap, reqSnap, paidSnap, supportSnap] = await Promise.all([
       db.collection('landlords').get(),
-      db.collection('subscriptionRequests').where('statut', '==', 'en_attente').get()
+      db.collection('subscriptionRequests').where('statut', '==', 'en_attente').get(),
+      db.collection('subscriptionRequests').where('statut', '==', 'validee').get(),
+      db.collection('supportMessages').get()
     ]);
     const total = landlordsSnap.size;
     const actifs = landlordsSnap.docs.filter(d => d.data().abonnementStatut === 'actif').length;
     const requests = reqSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const revenuTotal = paidSnap.docs.reduce((sum, d) => sum + (Number(d.data().montant) || 0), 0);
+    const supportMsgs = supportSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.dateCreation || '').localeCompare(a.dateCreation || ''));
+
+    allLandlords = landlordsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
     const statsEl = document.getElementById('stats');
     statsEl.innerHTML = `
       <div class="stat"><div class="stat-num mono">${total}</div><div class="stat-label">Propriétaires</div></div>
       <div class="stat"><div class="stat-num mono">${actifs}</div><div class="stat-label">Abonnements actifs</div></div>
-      <div class="stat"><div class="stat-num mono accent">${requests.length}</div><div class="stat-label">En attente</div></div>`;
+      <div class="stat"><div class="stat-num mono accent">${requests.length}</div><div class="stat-label">En attente</div></div>
+      <div class="stat"><div class="stat-num mono">${fmtFCFA(revenuTotal)}</div><div class="stat-label">Revenu total</div></div>`;
 
     renderQueue(requests);
+    renderLandlordsList(allLandlords);
+    renderSupportList(supportMsgs);
   } catch (err) {
     document.getElementById('queue').innerHTML = `<div class="empty">Erreur de chargement<span class="mono">${esc(err.message)}</span></div>`;
     toast('Erreur : ' + err.message, 'err');
   }
+}
+
+function renderSupportList(list){
+  const el = document.getElementById('support-list');
+  const countEl = document.getElementById('support-count');
+  const nouveaux = list.filter(m => m.statut !== 'traite').length;
+  if (countEl) countEl.textContent = nouveaux;
+  if (list.length === 0) {
+    el.innerHTML = `<div class="empty">Aucun message pour l'instant.</div>`;
+    return;
+  }
+  el.innerHTML = list.map(m => `
+    <div class="row" data-row="msg-${m.id}">
+      <div class="row-top">
+        <div class="row-name"><span class="dot" style="background:${m.statut === 'traite' ? 'var(--ok)' : 'var(--warn)'};"></span>${esc(m.landlordNom || m.landlordEmail || '—')}</div>
+        ${m.statut === 'traite' ? `<span class="plan-tag actif">Traité</span>` : `<button class="btn btn-ok" data-act="mark-treated" data-id="${m.id}">Marquer traité</button>`}
+      </div>
+      <div class="row-meta">${esc(m.sujet || '—')} · ${esc(m.landlordEmail || '—')} · ${esc(m.dateCreation || '—')}</div>
+      <div style="margin-top:8px;font-size:13px;color:var(--ink);">${esc(m.message || '')}</div>
+    </div>`).join('');
+
+  el.querySelectorAll('button[data-act="mark-treated"]').forEach(btn => {
+    btn.addEventListener('click', () => markSupportTreated(btn.getAttribute('data-id')));
+  });
+}
+async function markSupportTreated(id){
+  try {
+    await db.collection('supportMessages').doc(id).update({ statut: 'traite' });
+    toast('Message marqué comme traité');
+    await loadData();
+  } catch (err) {
+    toast('Erreur : ' + err.message, 'err');
+  }
+}
+
+function filterLandlords(query){
+  const q = query.trim().toLowerCase();
+  if (!q) return allLandlords;
+  return allLandlords.filter(l =>
+    (l.nom || '').toLowerCase().includes(q) || (l.email || '').toLowerCase().includes(q)
+  );
+}
+
+function renderLandlordsList(list){
+  const el = document.getElementById('landlords-list');
+  const countEl = document.getElementById('landlord-count');
+  if (countEl) countEl.textContent = list.length;
+  if (list.length === 0) {
+    el.innerHTML = `<div class="empty">Aucun propriétaire trouvé.</div>`;
+    return;
+  }
+  el.innerHTML = list.map(l => {
+    const statut = l.abonnementStatut || 'essai';
+    const tagClass = statut === 'actif' ? 'actif' : statut === 'en_attente' ? 'attente' : l.plan ? 'essai' : 'none';
+    const planLabel = l.plan ? (PLAN_NOMS[l.plan] || l.plan) : 'Sans plan';
+    return `
+    <div class="row">
+      <div class="row-top">
+        <div class="row-name">${esc(l.nom || l.email || '—')}</div>
+        <button class="btn" data-act="edit-landlord" data-id="${l.id}">Modifier</button>
+      </div>
+      <div class="row-meta">
+        ${esc(l.email || '—')} · <span class="plan-tag ${tagClass}">${esc(planLabel)} · ${esc(statut)}</span>
+        ${l.abonnementExpire ? ' · expire ' + esc(l.abonnementExpire) : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('button[data-act="edit-landlord"]').forEach(btn => {
+    btn.addEventListener('click', () => openEditModal(btn.getAttribute('data-id')));
+  });
 }
 
 function renderQueue(requests){
@@ -405,6 +541,69 @@ async function rejectRequest(id){
 function setRowDisabled(id, val){
   const row = document.querySelector(`[data-row="${id}"]`);
   if (row) row.querySelectorAll('button').forEach(b => b.disabled = val);
+}
+
+/* ---------- Édition manuelle d'un abonnement ---------- */
+function openEditModal(uid){
+  const l = allLandlords.find(x => x.id === uid);
+  if (!l) { toast('Propriétaire introuvable', 'err'); return; }
+  const modalRoot = document.getElementById('modal-root');
+  modalRoot.innerHTML = `
+    <div class="modal-overlay" id="modal-overlay">
+      <div class="modal-card">
+        <div class="modal-card-head">
+          <h2 class="disp">Modifier l'abonnement</h2>
+          <button class="modal-close" id="modal-close">×</button>
+        </div>
+        <div class="modal-sub">${esc(l.nom || '—')} · ${esc(l.email || '—')}</div>
+        <div class="field">
+          <label>Plan</label>
+          <select id="edit-plan">
+            <option value="" ${!l.plan ? 'selected' : ''}>Aucun</option>
+            <option value="essentiel" ${l.plan === 'essentiel' ? 'selected' : ''}>Essentiel</option>
+            <option value="pro" ${l.plan === 'pro' ? 'selected' : ''}>Pro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Statut</label>
+          <select id="edit-statut">
+            <option value="essai" ${l.abonnementStatut === 'essai' ? 'selected' : ''}>Essai</option>
+            <option value="actif" ${l.abonnementStatut === 'actif' ? 'selected' : ''}>Actif</option>
+            <option value="en_attente" ${l.abonnementStatut === 'en_attente' ? 'selected' : ''}>En attente</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Expire le</label>
+          <input type="date" id="edit-expire" value="${esc(l.abonnementExpire || '')}">
+        </div>
+        <button class="save-btn" id="save-landlord-btn">Enregistrer</button>
+      </div>
+    </div>`;
+  document.getElementById('modal-close').addEventListener('click', closeEditModal);
+  document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target.id === 'modal-overlay') closeEditModal(); });
+  document.getElementById('save-landlord-btn').addEventListener('click', () => saveLandlordEdit(uid));
+}
+function closeEditModal(){
+  const modalRoot = document.getElementById('modal-root');
+  if (modalRoot) modalRoot.innerHTML = '';
+}
+async function saveLandlordEdit(uid){
+  const btn = document.getElementById('save-landlord-btn');
+  const plan = document.getElementById('edit-plan').value || null;
+  const statut = document.getElementById('edit-statut').value;
+  const expire = document.getElementById('edit-expire').value || null;
+  btn.disabled = true; btn.textContent = 'Enregistrement...';
+  try {
+    await db.collection('landlords').doc(uid).update({
+      plan: plan, abonnementStatut: statut, abonnementExpire: expire
+    });
+    toast('Abonnement mis à jour');
+    closeEditModal();
+    await loadData();
+  } catch (err) {
+    toast('Erreur : ' + err.message, 'err');
+    btn.disabled = false; btn.textContent = 'Enregistrer';
+  }
 }
 
 /* ---------- Auth state ---------- */
